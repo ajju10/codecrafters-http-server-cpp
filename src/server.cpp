@@ -1,12 +1,74 @@
 #include <iostream>
 #include <cstdlib>
 #include <string>
+#include <vector>
+#include <sstream>
 #include <cstring>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+
+const int BUFFER_SIZE = 1024;
+
+enum HTTPVersion {
+  HTTP1_0 = 0,
+  HTTP1_1 = 1,
+  HTTP2_0 = 2
+};
+
+enum RequestMethod {
+  GET = 0,
+  POST = 1
+};
+
+struct http_client {
+  RequestMethod method;
+  std::string path;
+  HTTPVersion http_version;
+};
+
+enum HTTPCode {
+  OK = 200,
+  NOT_FOUND = 404
+};
+
+std::vector<std::string> split(const std::string &str, const char delim) {
+  std::stringstream stream(str);
+  std::vector<std::string> result;
+
+  std::string word;
+  while (std::getline(stream, word, delim)) {
+    result.push_back(word);
+  }
+  return result;
+}
+
+http_client parse_request_data(std::string &req_data) {
+  std::vector<std::string> req_lines = split(req_data, '\n');
+
+  std::vector<std::string> first_line = split(req_lines[0], ' ');
+
+  http_client client;
+  
+  if (first_line[0] == "GET") {
+    client.method = RequestMethod::GET;
+  } else if (first_line[0] == "POST") {
+    client.method = RequestMethod::POST;
+  }
+
+  client.path = first_line[1];
+  if (first_line[2] == "HTTP/1.0") {
+    client.http_version = HTTPVersion::HTTP1_0;
+  } else if (first_line[2] == "HTTP/1.1") {
+    client.http_version = HTTPVersion::HTTP1_1;
+  } else if (first_line[2] == "HTTP/2.0") {
+    client.http_version = HTTPVersion::HTTP2_0;
+  }
+
+  return client;
+}
 
 int main(int argc, char **argv) {
   // Uncomment this block to pass the first stage
@@ -48,8 +110,25 @@ int main(int argc, char **argv) {
   int client_fd = accept(server_fd, (struct sockaddr *) &client_addr, (socklen_t *) &client_addr_len);
   std::cout << "Client connected\n";
 
-  std::string response = "HTTP/1.1 200 OK\r\n\r\n";
-  send(client_fd, response.c_str(), response.size(), 0);
+  char buffer[BUFFER_SIZE];
+  int client_req = read(client_fd, buffer, sizeof(buffer));
+  if (client_req <= 0) {
+    std::cerr << "Client error\n";
+  }
+
+  std::string req_data(buffer);
+
+  http_client client = parse_request_data(req_data); 
+
+  std::string res;
+  if (client.path == "/") {
+    res = "HTTP/1.1 200 OK\r\n\r\n";
+  } else {
+    res = "HTTP/1.1 404 Not Found\r\n\r\n";
+  }
+
+  send(client_fd, res.c_str(), res.size(), 0);
+  
   close(client_fd);
 
   close(server_fd);
