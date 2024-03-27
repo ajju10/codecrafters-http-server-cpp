@@ -118,11 +118,18 @@ int main(int argc, char **argv) {
 
   std::string req_data(buffer);
 
-  http_client client = parse_request_data(req_data); 
+  http_client client = parse_request_data(req_data);
 
-  std::string res;
+  std::string res = "";
   if (client.path == "/") {
     res = "HTTP/1.1 200 OK\r\n\r\n";
+  } else if (client.path.find("/echo") != std::string::npos) {
+    std::string random_str = "";
+    for (int i = 6; i < client.path.size(); i++) {
+      random_str += client.path[i];
+    }
+    res = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " 
+          + std::to_string(random_str.size()) + "\r\n\r\n" + random_str + "\r\n";
   } else {
     res = "HTTP/1.1 404 Not Found\r\n\r\n";
   }
