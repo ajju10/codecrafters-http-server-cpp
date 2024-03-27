@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <sstream>
 #include <cstring>
 #include <unistd.h>
@@ -27,6 +28,7 @@ struct http_client {
   RequestMethod method;
   std::string path;
   HTTPVersion http_version;
+  std::unordered_map<std::string, std::string> headers;
 };
 
 enum HTTPCode {
@@ -43,6 +45,15 @@ std::vector<std::string> split(const std::string &str, const char delim) {
     result.push_back(word);
   }
   return result;
+}
+
+std::unordered_map<std::string, std::string> parse_headers(const std::vector<std::string> &req_lines) {
+  std::cout << "Parsing headers\n";
+  for (auto &word: req_lines)
+    std::cout << word << '\n';
+
+  std::unordered_map<std::string, std::string> headers;
+  return headers;
 }
 
 http_client parse_request_data(std::string &req_data) {
@@ -66,6 +77,8 @@ http_client parse_request_data(std::string &req_data) {
   } else if (first_line[2] == "HTTP/2.0") {
     client.http_version = HTTPVersion::HTTP2_0;
   }
+
+  // client.headers = parse_headers(req_lines);
 
   return client;
 }
@@ -117,7 +130,6 @@ int main(int argc, char **argv) {
   }
 
   std::string req_data(buffer);
-
   http_client client = parse_request_data(req_data);
 
   std::string res = "";
@@ -129,7 +141,15 @@ int main(int argc, char **argv) {
       random_str += client.path[i];
     }
     res = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " 
-          + std::to_string(random_str.size()) + "\r\n\r\n" + random_str + "\r\n";
+          + std::to_string(random_str.size()) + "\r\n\r\n" + random_str;
+  } else if (client.path == "/user-agent") {
+    size_t start = req_data.find("User-Agent: ");
+    size_t end = req_data.find("\r\n", start);
+    size_t agent_len = strlen("User-Agent: ");
+    std::string header_value = req_data.substr(start + agent_len, end - agent_len - start);
+    std::cout << "Header value: " << header_value << '\n';
+    res = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+          + std::to_string(header_value.size()) + "\r\n\r\n" + header_value;
   } else {
     res = "HTTP/1.1 404 Not Found\r\n\r\n";
   }
