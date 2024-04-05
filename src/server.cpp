@@ -48,21 +48,34 @@ void clientHandler(int connfd, std::string file_path) {
     std::string::size_type dir_start = receive.find("/files") + 7;
     std::string::size_type dir_end = receive.find(" ", dir_start);
     std::string file_name = receive.substr(dir_start, dir_end - dir_start);
-    std::fstream file(file_path + "/" + file_name);
-    if (file.is_open()) {
-      send_buffer = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ";
-      std::string file_content;
-      char char_buffer;
-      while (!file.eof()) {
-        file.get(char_buffer);
-        if (char_buffer == '\n') {
-          file_content += '\r';
-        }
-        file_content += char_buffer;
+    if (receive.find("POST") != std::string::npos) {
+      std::ofstream file_post(file_path + "/" + file_name);
+      std::cout << "Filename: " << file_name << '\n';
+      if (file_post) {
+        std::string buff = receive.substr(receive.find_last_of('\n')+1);
+        file_post << buff.c_str();
+        file_post.close();
+        send_buffer += "HTTP/1.1 201 Created\r\n\r\n";
+      } else {
+        send_buffer += "HTTP/1.1 404 Not Found\r\n\r\n";
       }
-      send_buffer += std::to_string(file_content.size() - 1) + "\r\n\r\n" + file_content + "\r\n";
     } else {
-      send_buffer = "HTTP/1.1 404 Not Found\r\n\r\n";
+      std::fstream file(file_path + "/" + file_name);
+      if (file.is_open()) {
+        send_buffer = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ";
+        std::string file_content;
+        char char_buffer;
+        while (!file.eof()) {
+          file.get(char_buffer);
+          if (char_buffer == '\n') {
+            file_content += '\r';
+          }
+          file_content += char_buffer;
+        }
+        send_buffer += std::to_string(file_content.size() - 1) + "\r\n\r\n" + file_content + "\r\n";
+      } else {
+        send_buffer = "HTTP/1.1 404 Not Found\r\n\r\n";
+      }
     }
   } else {
     send_buffer = "HTTP/1.1 404 Not Found\r\n\r\n";
