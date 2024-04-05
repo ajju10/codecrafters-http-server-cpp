@@ -46,4 +46,8 @@ CTestTestfile.cmake
 _deps
 
 # Editors
-.vscode
+.vscode/
+.idea/
+
+# Config files
+.clang-format
